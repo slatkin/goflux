@@ -44,7 +44,7 @@ type Model struct {
 func NewModel(cfg config.Config) Model {
 	client := miniflux.NewClient(cfg.ServerUrl, cfg.ApiKey, cfg.AllowInvalidCerts)
 	vp := viewport.New(0, 0)
-	vp.Style = lipgloss.NewStyle()
+	vp.Style = lipgloss.NewStyle().Padding(1, 2)
 
 	return Model{
 		Client:   client,
@@ -228,18 +228,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.WindowSizeMsg:
-		// Account for border (2) and padding (2) logic
-		// But in View() we add border.
-		// Viewport should be sized to fit INSIDE the border.
-		// W = Msg.W - 2 (border)
-		// H = Msg.H - 2 (border)
-
-		headerHeight := 0
-		footerHeight := 0                                 // Status bar?
-		verticalMargin := headerHeight + footerHeight + 2 // +2 for border
-
-		m.Viewport.Width = msg.Width - 2 // -2 for horizontal border
-		m.Viewport.Height = msg.Height - verticalMargin
+		m.Viewport.Width = msg.Width
+		m.Viewport.Height = msg.Height - 1 // Leave room for status bar
 
 		if m.State == StateReading && m.Selected != nil {
 			// Re-render content with new width
@@ -270,20 +260,7 @@ func (m Model) View() string {
 	case StateError:
 		return fmt.Sprintf("Error: %v", m.Err)
 	case StateReading:
-		// Border handling is done in renderEntryContent or View?
-		// Viewport.View() returns the content inside the viewport.
-		// We want to surround it with a border.
-		// But viewport handles scrolling. If we put border outside, it's static.
-		// If we put border inside, it scrolls.
-		// Cliflux likely has a static border.
-		// Viewport size should be inner size.
-
-		// Let's wrap the viewport view in a style.
-		return lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("62")).
-			Padding(0, 1). // Padding inside border
-			Render(m.Viewport.View())
+		return m.Viewport.View()
 	case StateList:
 		return m.viewList()
 	}
@@ -375,7 +352,7 @@ func renderEntryContent(entry *miniflux.FeedEntry, width int) string {
 	)
 
 	// Create a style request wrapping to the effective viewport width
-	// Border (2) + Padding (2) = 4 chars reduction
+	// Padding is (1, 2) which means 2 on left + 2 on right = 4 total horizontal padding
 	wrapWidth := width - 4
 	if wrapWidth < 20 {
 		wrapWidth = 20
